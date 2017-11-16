@@ -3,85 +3,98 @@
  * It was generated using rpcgen.
  */
 
+#include <memory.h> /* for memset */
 #include "ssnfs.h"
 
 /* Default timeout can be changed using clnt_control() */
 static struct timeval TIMEOUT = { 25, 0 };
 
 open_output *
-open_file_1(argp, clnt)
-	open_input *argp;
-	CLIENT *clnt;
+open_file_1(open_input *argp, CLIENT *clnt)
 {
 	static open_output clnt_res;
 
 	memset((char *)&clnt_res, 0, sizeof(clnt_res));
-	if (clnt_call(clnt, open_file, xdr_open_input, argp, xdr_open_output, &clnt_res, TIMEOUT) != RPC_SUCCESS)
+	if (clnt_call (clnt, open_file,
+		(xdrproc_t) xdr_open_input, (caddr_t) argp,
+		(xdrproc_t) xdr_open_output, (caddr_t) &clnt_res,
+		TIMEOUT) != RPC_SUCCESS) {
 		return (NULL);
+	}
 	return (&clnt_res);
 }
 
 read_output *
-read_file_1(argp, clnt)
-	read_input *argp;
-	CLIENT *clnt;
+read_file_1(read_input *argp, CLIENT *clnt)
 {
 	static read_output clnt_res;
 
 	memset((char *)&clnt_res, 0, sizeof(clnt_res));
-	if (clnt_call(clnt, read_file, xdr_read_input, argp, xdr_read_output, &clnt_res, TIMEOUT) != RPC_SUCCESS)
+	if (clnt_call (clnt, read_file,
+		(xdrproc_t) xdr_read_input, (caddr_t) argp,
+		(xdrproc_t) xdr_read_output, (caddr_t) &clnt_res,
+		TIMEOUT) != RPC_SUCCESS) {
 		return (NULL);
+	}
 	return (&clnt_res);
 }
 
 write_output *
-write_file_1(argp, clnt)
-	write_input *argp;
-	CLIENT *clnt;
+write_file_1(write_input *argp, CLIENT *clnt)
 {
 	static write_output clnt_res;
 
 	memset((char *)&clnt_res, 0, sizeof(clnt_res));
-	if (clnt_call(clnt, write_file, xdr_write_input, argp, xdr_write_output, &clnt_res, TIMEOUT) != RPC_SUCCESS)
+	if (clnt_call (clnt, write_file,
+		(xdrproc_t) xdr_write_input, (caddr_t) argp,
+		(xdrproc_t) xdr_write_output, (caddr_t) &clnt_res,
+		TIMEOUT) != RPC_SUCCESS) {
 		return (NULL);
+	}
 	return (&clnt_res);
 }
 
 list_output *
-list_files_1(argp, clnt)
-	list_input *argp;
-	CLIENT *clnt;
+list_files_1(list_input *argp, CLIENT *clnt)
 {
 	static list_output clnt_res;
 
 	memset((char *)&clnt_res, 0, sizeof(clnt_res));
-	if (clnt_call(clnt, list_files, xdr_list_input, argp, xdr_list_output, &clnt_res, TIMEOUT) != RPC_SUCCESS)
+	if (clnt_call (clnt, list_files,
+		(xdrproc_t) xdr_list_input, (caddr_t) argp,
+		(xdrproc_t) xdr_list_output, (caddr_t) &clnt_res,
+		TIMEOUT) != RPC_SUCCESS) {
 		return (NULL);
+	}
 	return (&clnt_res);
 }
 
 delete_output *
-delete_file_1(argp, clnt)
-	delete_input *argp;
-	CLIENT *clnt;
+delete_file_1(delete_input *argp, CLIENT *clnt)
 {
 	static delete_output clnt_res;
 
 	memset((char *)&clnt_res, 0, sizeof(clnt_res));
-	if (clnt_call(clnt, delete_file, xdr_delete_input, argp, xdr_delete_output, &clnt_res, TIMEOUT) != RPC_SUCCESS)
+	if (clnt_call (clnt, delete_file,
+		(xdrproc_t) xdr_delete_input, (caddr_t) argp,
+		(xdrproc_t) xdr_delete_output, (caddr_t) &clnt_res,
+		TIMEOUT) != RPC_SUCCESS) {
 		return (NULL);
+	}
 	return (&clnt_res);
 }
 
 close_output *
-close_file_1(argp, clnt)
-	close_input *argp;
-	CLIENT *clnt;
+close_file_1(close_input *argp, CLIENT *clnt)
 {
 	static close_output clnt_res;
 
 	memset((char *)&clnt_res, 0, sizeof(clnt_res));
-	if (clnt_call(clnt, close_file, xdr_close_input, argp, xdr_close_output, &clnt_res, TIMEOUT) != RPC_SUCCESS)
+	if (clnt_call (clnt, close_file,
+		(xdrproc_t) xdr_close_input, (caddr_t) argp,
+		(xdrproc_t) xdr_close_output, (caddr_t) &clnt_res,
+		TIMEOUT) != RPC_SUCCESS) {
 		return (NULL);
+	}
 	return (&clnt_res);
 }

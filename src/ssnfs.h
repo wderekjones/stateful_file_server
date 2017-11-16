@@ -6,9 +6,12 @@
 #ifndef _SSNFS_H_RPCGEN
 #define _SSNFS_H_RPCGEN
 
-#define RPCGEN_VERSION	199506
-
 #include <rpc/rpc.h>
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 
 struct open_input {
@@ -16,27 +19,11 @@ struct open_input {
 	char file_name[10];
 };
 typedef struct open_input open_input;
-#ifdef __cplusplus
-extern "C" bool_t xdr_open_input(XDR *, open_input*);
-#elif __STDC__
-extern  bool_t xdr_open_input(XDR *, open_input*);
-#else /* Old Style C */
-bool_t xdr_open_input();
-#endif /* Old Style C */
-
 
 struct open_output {
 	int fd;
 };
 typedef struct open_output open_output;
-#ifdef __cplusplus
-extern "C" bool_t xdr_open_output(XDR *, open_output*);
-#elif __STDC__
-extern  bool_t xdr_open_output(XDR *, open_output*);
-#else /* Old Style C */
-bool_t xdr_open_output();
-#endif /* Old Style C */
-
 
 struct read_input {
 	char user_name[10];
@@ -44,14 +31,6 @@ struct read_input {
 	int numbytes;
 };
 typedef struct read_input read_input;
-#ifdef __cplusplus
-extern "C" bool_t xdr_read_input(XDR *, read_input*);
-#elif __STDC__
-extern  bool_t xdr_read_input(XDR *, read_input*);
-#else /* Old Style C */
-bool_t xdr_read_input();
-#endif /* Old Style C */
-
 
 struct read_output {
 	struct {
@@ -60,14 +39,6 @@ struct read_output {
 	} out_msg;
 };
 typedef struct read_output read_output;
-#ifdef __cplusplus
-extern "C" bool_t xdr_read_output(XDR *, read_output*);
-#elif __STDC__
-extern  bool_t xdr_read_output(XDR *, read_output*);
-#else /* Old Style C */
-bool_t xdr_read_output();
-#endif /* Old Style C */
-
 
 struct write_input {
 	char user_name[10];
@@ -79,14 +50,6 @@ struct write_input {
 	} buffer;
 };
 typedef struct write_input write_input;
-#ifdef __cplusplus
-extern "C" bool_t xdr_write_input(XDR *, write_input*);
-#elif __STDC__
-extern  bool_t xdr_write_input(XDR *, write_input*);
-#else /* Old Style C */
-bool_t xdr_write_input();
-#endif /* Old Style C */
-
 
 struct write_output {
 	struct {
@@ -95,27 +58,11 @@ struct write_output {
 	} out_msg;
 };
 typedef struct write_output write_output;
-#ifdef __cplusplus
-extern "C" bool_t xdr_write_output(XDR *, write_output*);
-#elif __STDC__
-extern  bool_t xdr_write_output(XDR *, write_output*);
-#else /* Old Style C */
-bool_t xdr_write_output();
-#endif /* Old Style C */
-
 
 struct list_input {
 	char user_name[10];
 };
 typedef struct list_input list_input;
-#ifdef __cplusplus
-extern "C" bool_t xdr_list_input(XDR *, list_input*);
-#elif __STDC__
-extern  bool_t xdr_list_input(XDR *, list_input*);
-#else /* Old Style C */
-bool_t xdr_list_input();
-#endif /* Old Style C */
-
 
 struct list_output {
 	struct {
@@ -124,28 +71,12 @@ struct list_output {
 	} out_msg;
 };
 typedef struct list_output list_output;
-#ifdef __cplusplus
-extern "C" bool_t xdr_list_output(XDR *, list_output*);
-#elif __STDC__
-extern  bool_t xdr_list_output(XDR *, list_output*);
-#else /* Old Style C */
-bool_t xdr_list_output();
-#endif /* Old Style C */
-
 
 struct delete_input {
 	char user_name[10];
 	char file_name[10];
 };
 typedef struct delete_input delete_input;
-#ifdef __cplusplus
-extern "C" bool_t xdr_delete_input(XDR *, delete_input*);
-#elif __STDC__
-extern  bool_t xdr_delete_input(XDR *, delete_input*);
-#else /* Old Style C */
-bool_t xdr_delete_input();
-#endif /* Old Style C */
-
 
 struct delete_output {
 	struct {
@@ -154,28 +85,12 @@ struct delete_output {
 	} out_msg;
 };
 typedef struct delete_output delete_output;
-#ifdef __cplusplus
-extern "C" bool_t xdr_delete_output(XDR *, delete_output*);
-#elif __STDC__
-extern  bool_t xdr_delete_output(XDR *, delete_output*);
-#else /* Old Style C */
-bool_t xdr_delete_output();
-#endif /* Old Style C */
-
 
 struct close_input {
 	char user_name[10];
 	int fd;
 };
 typedef struct close_input close_input;
-#ifdef __cplusplus
-extern "C" bool_t xdr_close_input(XDR *, close_input*);
-#elif __STDC__
-extern  bool_t xdr_close_input(XDR *, close_input*);
-#else /* Old Style C */
-bool_t xdr_close_input();
-#endif /* Old Style C */
-
 
 struct close_output {
 	struct {
@@ -184,77 +99,87 @@ struct close_output {
 	} out_msg;
 };
 typedef struct close_output close_output;
-#ifdef __cplusplus
-extern "C" bool_t xdr_close_output(XDR *, close_output*);
-#elif __STDC__
-extern  bool_t xdr_close_output(XDR *, close_output*);
-#else /* Old Style C */
-bool_t xdr_close_output();
-#endif /* Old Style C */
 
+#define SSNFSPROG 0x31110023
+#define SSNFSVER 1
 
-#define SSNFSPROG ((rpc_uint)0x31110023)
-#define SSNFSVER ((rpc_uint)1)
-
-#ifdef __cplusplus
-#define open_file ((rpc_uint)1)
-extern "C" open_output * open_file_1(open_input *, CLIENT *);
-extern "C" open_output * open_file_1_svc(open_input *, struct svc_req *);
-#define read_file ((rpc_uint)2)
-extern "C" read_output * read_file_1(read_input *, CLIENT *);
-extern "C" read_output * read_file_1_svc(read_input *, struct svc_req *);
-#define write_file ((rpc_uint)3)
-extern "C" write_output * write_file_1(write_input *, CLIENT *);
-extern "C" write_output * write_file_1_svc(write_input *, struct svc_req *);
-#define list_files ((rpc_uint)4)
-extern "C" list_output * list_files_1(list_input *, CLIENT *);
-extern "C" list_output * list_files_1_svc(list_input *, struct svc_req *);
-#define delete_file ((rpc_uint)5)
-extern "C" delete_output * delete_file_1(delete_input *, CLIENT *);
-extern "C" delete_output * delete_file_1_svc(delete_input *, struct svc_req *);
-#define close_file ((rpc_uint)6)
-extern "C" close_output * close_file_1(close_input *, CLIENT *);
-extern "C" close_output * close_file_1_svc(close_input *, struct svc_req *);
-
-#elif __STDC__
-#define open_file ((rpc_uint)1)
+#if defined(__STDC__) || defined(__cplusplus)
+#define open_file 1
 extern  open_output * open_file_1(open_input *, CLIENT *);
 extern  open_output * open_file_1_svc(open_input *, struct svc_req *);
-#define read_file ((rpc_uint)2)
+#define read_file 2
 extern  read_output * read_file_1(read_input *, CLIENT *);
 extern  read_output * read_file_1_svc(read_input *, struct svc_req *);
-#define write_file ((rpc_uint)3)
+#define write_file 3
 extern  write_output * write_file_1(write_input *, CLIENT *);
 extern  write_output * write_file_1_svc(write_input *, struct svc_req *);
-#define list_files ((rpc_uint)4)
+#define list_files 4
 extern  list_output * list_files_1(list_input *, CLIENT *);
 extern  list_output * list_files_1_svc(list_input *, struct svc_req *);
-#define delete_file ((rpc_uint)5)
+#define delete_file 5
 extern  delete_output * delete_file_1(delete_input *, CLIENT *);
 extern  delete_output * delete_file_1_svc(delete_input *, struct svc_req *);
-#define close_file ((rpc_uint)6)
+#define close_file 6
 extern  close_output * close_file_1(close_input *, CLIENT *);
 extern  close_output * close_file_1_svc(close_input *, struct svc_req *);
+extern int ssnfsprog_1_freeresult (SVCXPRT *, xdrproc_t, caddr_t);
 
-#else /* Old Style C */
-#define open_file ((rpc_uint)1)
+#else /* K&R C */
+#define open_file 1
 extern  open_output * open_file_1();
 extern  open_output * open_file_1_svc();
-#define read_file ((rpc_uint)2)
+#define read_file 2
 extern  read_output * read_file_1();
 extern  read_output * read_file_1_svc();
-#define write_file ((rpc_uint)3)
+#define write_file 3
 extern  write_output * write_file_1();
 extern  write_output * write_file_1_svc();
-#define list_files ((rpc_uint)4)
+#define list_files 4
 extern  list_output * list_files_1();
 extern  list_output * list_files_1_svc();
-#define delete_file ((rpc_uint)5)
+#define delete_file 5
 extern  delete_output * delete_file_1();
 extern  delete_output * delete_file_1_svc();
-#define close_file ((rpc_uint)6)
+#define close_file 6
 extern  close_output * close_file_1();
 extern  close_output * close_file_1_svc();
-#endif /* Old Style C */
+extern int ssnfsprog_1_freeresult ();
+#endif /* K&R C */
+
+/* the xdr functions */
+
+#if defined(__STDC__) || defined(__cplusplus)
+extern  bool_t xdr_open_input (XDR *, open_input*);
+extern  bool_t xdr_open_output (XDR *, open_output*);
+extern  bool_t xdr_read_input (XDR *, read_input*);
+extern  bool_t xdr_read_output (XDR *, read_output*);
+extern  bool_t xdr_write_input (XDR *, write_input*);
+extern  bool_t xdr_write_output (XDR *, write_output*);
+extern  bool_t xdr_list_input (XDR *, list_input*);
+extern  bool_t xdr_list_output (XDR *, list_output*);
+extern  bool_t xdr_delete_input (XDR *, delete_input*);
+extern  bool_t xdr_delete_output (XDR *, delete_output*);
+extern  bool_t xdr_close_input (XDR *, close_input*);
+extern  bool_t xdr_close_output (XDR *, close_output*);
+
+#else /* K&R C */
+extern bool_t xdr_open_input ();
+extern bool_t xdr_open_output ();
+extern bool_t xdr_read_input ();
+extern bool_t xdr_read_output ();
+extern bool_t xdr_write_input ();
+extern bool_t xdr_write_output ();
+extern bool_t xdr_list_input ();
+extern bool_t xdr_list_output ();
+extern bool_t xdr_delete_input ();
+extern bool_t xdr_delete_output ();
+extern bool_t xdr_close_input ();
+extern bool_t xdr_close_output ();
+
+#endif /* K&R C */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* !_SSNFS_H_RPCGEN */

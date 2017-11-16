@@ -8,8 +8,6 @@ struct open_output
   int fd;
 };
 
-
-
 struct read_input
 {
   char user_name[10];
