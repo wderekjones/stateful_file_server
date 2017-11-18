@@ -29,7 +29,6 @@ int init_disk() {
     }
 }
 
-
 // Obtain a free page for a file to use.  Returns page number.
 int get_free_page() {
     int fd;
@@ -174,13 +173,15 @@ int file_delete(char *username, char *filename) {
     return found;
 }
 
-// RPC call "create".
-write_output * create_file_1_svc(open_input *inp, struct svc_req *rqstp) {
+
+// RPC call "open".
+open_output * open_file_1_svc(open_input *inp, struct svc_req *b)
+{
     int fd, page;
     file_info fi;
     char message[512];
 
-    printf("create_file_1_svc: (user_name = '%s', file_name = '%s')\n", inp->user_name, inp->file_name);
+    printf("open_file_1_svc: (user_name = '%s', file_name = '%s')\n", inp->user_name, inp->file_name);
     init_disk();
 
     printf("file exists %d\n", file_exists(inp->user_name, inp->file_name));
@@ -193,61 +194,93 @@ write_output * create_file_1_svc(open_input *inp, struct svc_req *rqstp) {
             fi.pages[0] = page;
         else
             printf("no pages left");
-        if (add_file(fi)) {
+        if (add_file(fi))
+        {
             snprintf(message, 512, "%s created for user %s", inp->file_name, inp->user_name);
-        } else {
+        }
+        else
+        {
             strcpy(message, "Error: Max number of files reached.");
         }
     }
-    else {
+    else
+    {
         strcpy(message, "Error: file already exists");
     }
 
-    static write_output out;
-    out.out_msg.out_msg_len = strlen(message) + 1;
-    out.out_msg.out_msg_val = strdup(message);
+    static open_output out;
+    out.fd = fopen(inp->file_name, "a+");
     return &out;
 }
 
-// RPC call "list".
-list_output * list_files_1_svc(list_input *inp, struct svc_req *rqstp) {
-  /*
-    char message[512];
-    char buffer[512];
 
-    init_disk();
+// RPC call "read".
+read_output * read_file_1_svc(read_input *inp, struct svc_req *rqstp) {
+    char *message, *buffer;
+    // offset is where to begin the read, at is the current position of the client from previous reads
+    int offset, numbytes, at, page_index, page_num, len, fd, buffer_size, message_size, read_fail;
+    file_info fi;
 
-    printf("list_file_1_svc: (usrname = '%s')\n", inp->user_name);
-    file_list(inp->user_name, buffer);
-    printf("files: %s\n", buffer);
-    static list_output out;
-    snprintf(message, 512, "The files are:%s", buffer);
-    out.out_msg.out_msg_len = strlen(message) + 1;
-    out.out_msg.out_msg_val = strdup(message);
-    return &out;
-    */
-}
-
-// RCP call "delete".
-delete_output * delete_file_1_svc(delete_input *inp, struct svc_req *rqstp) {
-    char message[512];
-
-    init_disk();
-/*
-    printf("delete_file_1_svc: (user_name = '%s', file_name = '%s')\n", inp->user_name, inp->file_name);
-    static delete_output out;
+    // printf("read_file_1_svc: (user_name = '%s', file_name = '%s' offset = %d numbytes = %d)\n",
+           // inp->user_name, inp->file_name, inp->offset, inp->numbytes);
+    static read_output out;
+    /*
     if (file_exists(inp->user_name, inp->file_name)) {
-        file_delete(inp->user_name, inp->file_name);
-        snprintf(message, 512, "%s deleted", inp->file_name);
+        offset = inp->offset;
+        numbytes = inp->numbytes;
+        at = 0;
+        buffer_size = numbytes + 1;
+        buffer = malloc(buffer_size);
+        memset(buffer, 0, buffer_size);
+        char *reply = "Content read: ";
+        message_size = strlen(reply) + buffer_size;
+        get_file_info(inp->user_name, inp->file_name, &fi);
+        read_fail = 0;
+        while (at < numbytes) {
+            printf("at = %d\n", at);
+            page_index = offset / PAGE_SIZE;
+            if (page_index >= fi.used) {
+                read_fail = 1;
+                break;
+            }
+            page_num = fi.pages[page_index];
+            if ((numbytes - at) < (PAGE_SIZE - (offset % PAGE_SIZE))) {
+                len = numbytes - at;
+            } else {
+                len = PAGE_SIZE - (offset % PAGE_SIZE);
+            }
+            fd = open("disk.dat", O_RDONLY);
+            lseek(fd, (PAGE_SIZE * page_num) + (offset % PAGE_SIZE), SEEK_SET);
+            printf("len = %d\n", len);
+            read(fd, buffer+at, len);
+            close(fd);
+            at += len;
+            offset += len;
+            printf("%s\n", buffer);
+        }
+        buffer[numbytes] = '\x00';
+        if (read_fail) {
+            message = malloc(512);
+            snprintf(message, 512, "Error: writing past end of file.");
+            printf("%s\n", message);
+        } else {
+            message = malloc(message_size);
+            memset(message, 0, message_size);
+            snprintf(message, message_size, "Content read: %s", buffer);
+            printf("%s\n", message);
+        }
     } else {
-        // file doesn't exist
+        message = malloc(512);
         snprintf(message, 512, "Error: file %s does not exist.", inp->file_name);
-    }
-    out.out_msg.out_msg_len = strlen(message) + 1;
-    out.out_msg.out_msg_val = strdup(message);
+    }*/
+    // out.out_msg.out_msg_len = strlen(message) + 1;
+    // out.out_msg.out_msg_val = strdup(message);
+    free(buffer);
+    free(message);
+    printf("%s (%d)\n", out.out_msg.out_msg_val, out.out_msg.out_msg_len);
     return &out;
-    */
 }
+
 
 // RPC call "write".
 write_output * write_file_1_svc(write_input *inp, struct svc_req *rqstp) {
@@ -255,7 +288,6 @@ write_output * write_file_1_svc(write_input *inp, struct svc_req *rqstp) {
     char *buffer;
     file_info fi;
     int fd, numbytes, offset, size, at, page_index, page_num, len;
-    init_disk();
     /*
     printf("write_file_1_svc: (user_name = '%s', file_name = '%s' offset = %d numbytes = %d)\n",
            inp->user_name, inp->file_name, inp->offset, inp->numbytes);
@@ -310,130 +342,51 @@ write_output * write_file_1_svc(write_input *inp, struct svc_req *rqstp) {
     */
 }
 
-open_output * open_file_1_svc(open_input *a, struct svc_req *b)
+
+// RPC call "list".
+list_output * list_files_1_svc(list_input *inp, struct svc_req *rqstp)
 {
-    open_output* result;
-    return result;
+    char message[512];
+    char buffer[512];
+    printf("list_file_1_svc: (username = '%s')\n", inp->user_name);
+    file_list(inp->user_name, buffer);
+    printf("files: %s\n", buffer);
+    static list_output out;
+    snprintf(message, 512, "The files are:%s", buffer);
+    out.out_msg.out_msg_len = strlen(message) + 1;
+    out.out_msg.out_msg_val = strdup(message);
+    return &out;
 }
 
-
-
-close_output * close_file_1_svc(close_input *a, struct svc_req *b)
+// RCP call "delete".
+delete_output * delete_file_1_svc(delete_input *inp, struct svc_req *rqstp)
 {
-  close_output* result;
-  return result;
-}
-
-
-// RPC call "read".
-read_output * read_file_1_svc(read_input *inp, struct svc_req *rqstp) {
-    char *message, *buffer;
-    int offset, numbytes, at, page_index, page_num, len, fd, buffer_size, message_size, read_fail;
-    file_info fi;
-    init_disk();
-    /*
-    printf("read_file_1_svc: (user_name = '%s', file_name = '%s' offset = %d numbytes = %d)\n",
-           inp->user_name, inp->file_name, inp->offset, inp->numbytes);
-    static read_output out;
-
-    if (file_exists(inp->user_name, inp->file_name)) {
-        offset = inp->offset;
-        numbytes = inp->numbytes;
-        at = 0;
-        buffer_size = numbytes + 1;
-        buffer = malloc(buffer_size);
-        memset(buffer, 0, buffer_size);
-        char *reply = "Content read: ";
-        message_size = strlen(reply) + buffer_size;
-        get_file_info(inp->user_name, inp->file_name, &fi);
-        read_fail = 0;
-        while (at < numbytes) {
-            printf("at = %d\n", at);
-            page_index = offset / PAGE_SIZE;
-            if (page_index >= fi.used) {
-                read_fail = 1;
-                break;
-            }
-            page_num = fi.pages[page_index];
-            if ((numbytes - at) < (PAGE_SIZE - (offset % PAGE_SIZE))) {
-                len = numbytes - at;
-            } else {
-                len = PAGE_SIZE - (offset % PAGE_SIZE);
-            }
-            fd = open("disk.dat", O_RDONLY);
-            lseek(fd, (PAGE_SIZE * page_num) + (offset % PAGE_SIZE), SEEK_SET);
-            printf("len = %d\n", len);
-            read(fd, buffer+at, len);
-            close(fd);
-            at += len;
-            offset += len;
-            printf("%s\n", buffer);
-        }
-        buffer[numbytes] = '\x00';
-        if (read_fail) {
-            message = malloc(512);
-            snprintf(message, 512, "Error: writing past end of file.");
-            printf("%s\n", message);
-        } else {
-            message = malloc(message_size);
-            memset(message, 0, message_size);
-            snprintf(message, message_size, "Content read: %s", buffer);
-            printf("%s\n", message);
-        }
-    } else {
-        message = malloc(512);
+    char message[512];
+    printf("delete_file_1_svc: (user_name = '%s', file_name = '%s')\n", inp->user_name, inp->file_name);
+    static delete_output out;
+    if (file_exists(inp->user_name, inp->file_name))
+    {
+        file_delete(inp->user_name, inp->file_name);
+        snprintf(message, 512, "%s deleted", inp->file_name);
+    }
+    else
+    {
+        // file doesn't exist
         snprintf(message, 512, "Error: file %s does not exist.", inp->file_name);
     }
     out.out_msg.out_msg_len = strlen(message) + 1;
     out.out_msg.out_msg_val = strdup(message);
-    free(buffer);
-    free(message);
-    printf("%s (%d)\n", out.out_msg.out_msg_val, out.out_msg.out_msg_len);
     return &out;
-    */
 }
 
-
-// RPC call "copy"
-/*
-copy_output * copy_file_1_svc(copy_input *inp, struct svc_req *rqstp) {
-    char message[512], page_buffer[PAGE_SIZE];
-    file_info fi_from, fi_to;
-    int i, fd;
-    init_disk();
-    /*
-    printf("copy_file_1_svc: (user_name = '%s', from_filename = '%s', to_filename = '%s')\n",
-           inp->user_name, inp->from_filename, inp->to_filename);
-
-    if (file_exists(inp->user_name, inp->from_filename)) {
-        if (file_exists(inp->user_name, inp->to_filename)) {
-            get_file_info(inp->user_name, inp->from_filename, &fi_from);
-            get_file_info(inp->user_name, inp->to_filename, &fi_to);
-            // Free pages in to-file.
-            for (i = 0; i < fi_to.used; i++) {
-                free_page(fi_to.pages[i]);
-            }
-            fi_to.used = fi_from.used;
-            for (i = 0; i < fi_to.used; i++) {
-                fd = open("disk.dat", O_RDWR);
-                fi_to.pages[i] = get_free_page();
-                lseek(fd, fi_from.pages[i] * PAGE_SIZE, SEEK_SET);
-                read(fd, page_buffer, PAGE_SIZE);
-                lseek(fd, fi_to.pages[i] * PAGE_SIZE, SEEK_SET);
-                write(fd, page_buffer, PAGE_SIZE);
-                close(fd);
-            }
-            snprintf(message,512, "file copied successfully");
-        } else {
-            snprintf(message, 512, "Error: file %s does not exist.", inp->to_filename);
-        }
-    } else {
-        snprintf(message, 512, "Error: file %s does not exist.", inp->from_filename);
-    }
-    static copy_output out;
-    out.out_msg.out_msg_len = strlen(message) + 1;
-    out.out_msg.out_msg_val = strdup(message);
-    return &out;
-
+// RPC call "close"
+close_output * close_file_1_svc(close_input *inp, struct svc_req *rqstp)
+{
+  char message[512];
+  int success = 0;
+  success = close(inp->fd);
+  printf("user '%s' deleted file: '%i'", inp->user_name, inp->fd);
+  // fclose(a->)
+  close_output* result;
+  return result;
 }
-*/

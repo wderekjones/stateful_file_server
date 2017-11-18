@@ -7,7 +7,7 @@
 #include <rpc/rpc.h> // Header for RPC calls.
 #include "ssnfs.h" // Header for the RPC service created by rpcgen.
 #include <readline/readline.h> // Readline is required for the main interactive loop.
-#include <readline/history.h> // Needed for prompt history.
+#include <readline/history.h> // Needed for prompt history
 #include <pwd.h> // Need to get username.
 
 int main(int argc, char **argv) {
