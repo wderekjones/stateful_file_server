@@ -209,7 +209,8 @@ open_output * open_file_1_svc(open_input *inp, struct svc_req *b)
     }
 
     static open_output out;
-    out.fd = fopen(inp->file_name, "a+");
+    out.fd = open(inp->file_name, O_RDONLY);
+    // printf("returning!\n");
     return &out;
 }
 

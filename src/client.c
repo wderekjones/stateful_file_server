@@ -29,8 +29,8 @@ int main(int argc, char **argv)
     // Main Interactive Loop.
     char *linebuffer, *command, *filename, *tofilename;  // Strings for the line buffer, command, filename...
     int valid_command; // Flag to determine if the user entered a valid command.
-    // void *outp; // All the output structs have the same structure, just use a single pointer.
-    write_output *outp;
+    void *outp; // All the output structs have the same structure, just use a single pointer.
+    // write_output *outp;
     char *offset, *numbytes, *buffer; // Parameters to read and write.
     for (;;) { // Loop until user enters EOF.
         linebuffer = readline("> "); // Prompt the user for a command.
@@ -38,14 +38,16 @@ int main(int argc, char **argv)
             break; // exit the interactive loop with no error.
         add_history(linebuffer); // Add input to history.
         command = strtok(linebuffer, " "); // Split off the first word, the command.
-        if (command) { // The line isn't blank...
+        if (command)
+        { // The line isn't blank...
             if (strcmp(command, "open") == 0)
             { // If the user enters the "create" command...
-                write_input in; // Input struct for the RPC call.
+                open_input in; // Input struct for the RPC call.
                 filename = strtok(NULL, " "); // Split off the name of the file to be created.
                 if (filename)
                 { // If the user does enter a filename...
                     strcpy(in.user_name, username); // Copy user name.
+                    strcpy(in.file_name, filename);
                     outp = open_file_1(&in, cl); // And call the create file RPC.
                     valid_command = 1; // User entered a valid command.
                 }
@@ -173,14 +175,18 @@ int main(int argc, char **argv)
                 fprintf(stderr, "remote procedure call failed"); // Report an error message.
                 exit(3); // And exit with an error code.
             }
-            else
-            {
-              char * output = malloc((outp->out_msg.out_msg_len + 1));
-              memset(output, 0, (outp)->out_msg.out_msg_len + 1);
-              strncpy(output, (outp)->out_msg.out_msg_val, (outp)->out_msg.out_msg_len + 1);
-              printf("%s\n", (outp)->out_msg.out_msg_val); // Print the result of the RPC call.
-              printf("%s\n", output); // Print the result of the RPC call.
-            }
+            // else
+            // {
+
+            write_output *outp = (write_output*)outp;
+
+            char *output = (char*)malloc(sizeof(char));
+            // char *output = outp->out_msg.out_msg_val;
+            memset(output, 0, outp->out_msg.out_msg_len);
+            // strncpy(output, outp->out_msg.out_msg_val, outp->out_msg.out_msg_len);
+            // printf("%s\n", outp->out_msg.out_msg_val); // Print the result of the RPC call.
+            printf("%s\n", output); // Print the result of the RPC call.
+            // }
         } // End of command processing branch.
       }
       valid_command = 0; // Reset flag.
