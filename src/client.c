@@ -24,12 +24,12 @@ int main(int argc, char **argv)
         exit(2); // And exit with an error code.
     }
 
-    char * username = getpwuid(geteuid())->pw_name; // Get the user's username.
+    char * username = getpwuid(getuid())->pw_name; // Get the user's username.
 
     // Main Interactive Loop.
     char *linebuffer, *command, *filename, *tofilename;  // Strings for the line buffer, command, filename...
-    int valid_command; // Flag to determine if the user entered a valid command.
-    void *outp; // All the output structs have the same structure, just use a single pointer.
+    int valid_command = 1; // Flag to determine if the user entered a valid command.
+    // void *outp; // All the output structs have the same structure, just use a single pointer.
     // write_output *outp;
     char *offset, *numbytes, *buffer; // Parameters to read and write.
     for (;;) { // Loop until user enters EOF.
@@ -48,8 +48,12 @@ int main(int argc, char **argv)
                 { // If the user does enter a filename...
                     strcpy(in.user_name, username); // Copy user name.
                     strcpy(in.file_name, filename);
-                    outp = open_file_1(&in, cl); // And call the create file RPC.
-                    valid_command = 1; // User entered a valid command.
+                    open_output *outp = open_file_1(&in, cl); // And call the create file RPC.
+                    if (outp == NULL)
+                    { // If the RPC call fails...
+                      valid_command = 0; // User entered a valid command.
+                    }
+                    printf("%i\n", outp->fd);
                 }
                 else
                 { // If the user doesn't enter a filename...
@@ -59,32 +63,31 @@ int main(int argc, char **argv)
             else if (strcmp(command, "read") == 0)
             { // If the user enters the "read" command...
                 read_input in; // Input struct for the RPC call.
-                filename = strtok(NULL, " "); // Split off the name of the file to be read.
-                if (filename)
-                { // If the user does enter a filename...
-                    offset = strtok(NULL, " "); // Split off the offset.
-                    if (offset)
-                    { // If the user does enter a filename...
-                        numbytes = strtok(NULL, " "); // Split off the offset.
-                        if (numbytes)
-                        { // If the user does enter a filename...
-                            strcpy(in.user_name, username); // Copy user name.
-                            outp = read_file_1(&in, cl); // And call the read file RPC.
-                            valid_command = 1; // User entered a valid command.
-                        }
-                        else
-                        {
-                            printf("Number of bytes required.\n"); // Report an error message.
-                        }
-                    }
-                    else
-                    { // If the user doesn't enter a filename...
-                        printf("Offset required.\n"); // Report an error message.
-                    }
+                // filename = strtok(NULL, " "); // Split off the name of the file to be read.
+                int read_fd = strtok(NULL, " "); // Split off the offset.
+                if (read_fd)
+                { // If the user does enter a file descriptor...
+                  numbytes = strtok(NULL, " "); // Split off the offset.
+                  if (numbytes)
+                  { // If the user does enter a filename...
+                      strcpy(in.user_name, username); // Copy user name.
+                      in.fd = atoi(read_fd);
+                      in.numbytes = atoi(numbytes);
+                      read_output *outp = read_file_1(&in, cl); // And call the read file RPC.
+                      // TODO: store the contents of the read_output pointer to a char buffer
+                      if (outp == NULL)
+                      { // If the RPC call fails...
+                          valid_command = 1; // User entered a valid command.
+                      }
+                  }
+                  else
+                  {
+                      printf("Number of bytes required.\n"); // Report an error message.
+                  }
                 }
                 else
                 { // If the user doesn't enter a filename...
-                    printf("Filename required.\n"); // Report an error message.
+                    printf("Offset required.\n"); // Report an error message.
                 }
             }
             else if (strcmp(command, "write") == 0)
@@ -107,8 +110,12 @@ int main(int argc, char **argv)
                                 in.numbytes = atoi(numbytes); // The number of bytes to write.
                                 in.buffer.buffer_val = strdup(buffer);
                                 in.buffer.buffer_len = strlen(buffer);
-                                outp = write_file_1(&in, cl); // And call the create file RPC.
-                                valid_command = 1; // User entered a valid command.
+                                write_output *outp = write_file_1(&in, cl); // And call the create file RPC.
+                                if (outp == NULL)
+                                { // If the RPC call fails...
+                                  valid_command = 0; // User entered a valid command.
+
+                                }
                             }
                             else
                             {
@@ -134,8 +141,14 @@ int main(int argc, char **argv)
             { // If the user enters the "list" command...
                 list_input in; // Input struct for the RPC call.
                 strcpy(in.user_name, username); // Copy user name.
-                outp = list_files_1(&in, cl); // And call the list file RPC.
-                valid_command = 1; // User entered a valid command.
+                list_output *outp = list_files_1(&in, cl); // And call the list file RPC.
+                if (outp == NULL)
+                { // If the RPC call fails...
+                  valid_command = 0; // User entered a valid command.
+                }
+                else{
+                  printf("%s\n", outp->out_msg.out_msg_val);
+                }
             }
             else if (strcmp(command, "delete") == 0)
             { // If the user enters the "delete" command...
@@ -145,8 +158,11 @@ int main(int argc, char **argv)
                 { // If the user does enter a filename...
                     strcpy(in.user_name, username); // Copy user name.
                     strcpy(in.file_name, filename); // Copy file name.
-                    outp = delete_file_1(&in, cl); // And call the create file RPC.
-                    valid_command = 1; // User entered a valid command.
+                    delete_output *outp = delete_file_1(&in, cl); // And call the delete file RPC.
+                    if (outp == NULL)
+                    { // If the RPC call fails...
+                      valid_command = 0; // User entered a valid command.
+                    }
                 }
                 else
                 { // If the user doesn't enter a filename...
@@ -155,41 +171,29 @@ int main(int argc, char **argv)
             }
             else if (strcmp(command, "close") == 0)
             {
-                close_input in; // Input struct for the RPC call.
+                close_input in;
                 filename = strtok(NULL, " "); // Split off the name of the file to be deleted.
                 if (filename)
                 { // If the user does enter a filename...
                     strcpy(in.user_name, username); // Copy user name.
-                    outp = close_file_1(&in, cl); // And call the close file RPC.
-                    valid_command = 1; // User entered a valid command.
+                    close_output *outp = close_file_1(&in, cl); // And call the close file RPC.
+                    if (outp == NULL)
+                    { // If the RPC call fails...
+                      valid_command = 0; // User entered an ivalid command.
+                    }
                 }
             }
             else
             { // User did not enter a recognized command.
                 printf("Unrecognized command.\n");
             } // End of command identification branch.
-        if (valid_command)
-        {
-            if (outp == NULL)
-            { // If the RPC call fails...
-                fprintf(stderr, "remote procedure call failed"); // Report an error message.
-                exit(3); // And exit with an error code.
+            if(!valid_command)
+            {
+              fprintf(stderr, "remote procedure call failed\n"); // Report an error message.
+              exit(3); // And exit with an error code.
             }
-            // else
-            // {
-
-            write_output *outp = (write_output*)outp;
-
-            char *output = (char*)malloc(sizeof(char));
-            // char *output = outp->out_msg.out_msg_val;
-            memset(output, 0, outp->out_msg.out_msg_len);
-            // strncpy(output, outp->out_msg.out_msg_val, outp->out_msg.out_msg_len);
-            // printf("%s\n", outp->out_msg.out_msg_val); // Print the result of the RPC call.
-            printf("%s\n", output); // Print the result of the RPC call.
-            // }
-        } // End of command processing branch.
       }
-      valid_command = 0; // Reset flag.
+      valid_command = 1; // Reset flag.
       free(linebuffer); // Free the buffer allocated by readline.
     }
     printf("\n"); // Make terminal look nice.
