@@ -95,9 +95,6 @@ int main(int argc, char **argv)
                 write_input in; // Input struct for the RPC call.
                 strcpy(in.user_name, username); // Copy user name.
                 filename = strtok(NULL, " "); // Split off the name of the file to which we will write.
-                if (filename)
-                { // If the user does enter a filename...
-                    offset = strtok(NULL, " "); // Split off offset of writing.
                     if (offset)
                     { // If the user does enter a filename...
                         numbytes = strtok(NULL, " "); // Split off the length of the write.
@@ -131,11 +128,7 @@ int main(int argc, char **argv)
                     { // User didn't enter an offset...
                         printf("Offset required.\n"); // Report an error message.
                     }
-                }
-                else
-                { // If the user doesn't enter a filename...
-                    printf("Filename required.\n"); // Report an error message.
-                }
+                
             }
             else if (strcmp(command, "list") == 0)
             { // If the user enters the "list" command...

@@ -6,6 +6,17 @@
 #include <fcntl.h> // Needed for ftruncate, etc.
 #include <errno.h> // Need for errno, strerror, etc.
 
+
+
+/*
+
+    Look at the implementation of read and write from the example code
+
+*/
+
+
+
+
 #define MAX_FILES 100 // The maximum number of files in the filesystem.
 #define MAX_PAGES 8 // The maximum number of pages per file.
 #define BLOCK_SIZE 512 // Blocks are 512 bytes.
