@@ -250,7 +250,7 @@ open_output * open_file_1_svc(open_input *inp, struct svc_req *b)
 // RPC call "read".
 read_output * read_file_1_svc(read_input *inp, struct svc_req *rqstp)
 {
-    // TODO: keep track of current position using a static variable?....
+    // TODO: when performing the read, need to check current position (read x bytes from [cur_pos - x] to [cur_pos])
     char message[512];
     char *buffer = message;
 
@@ -299,8 +299,13 @@ read_output * read_file_1_svc(read_input *inp, struct svc_req *rqstp)
             // move to the current page that the file is being edited on
             lseek(fd, (PAGE_SIZE * page_num), SEEK_SET);
 
-            printf("len = %d\n", len);
-            read(fd, buffer, numbytes);
+            // printf("len = %d\n", len);
+            if(
+            read(fd, buffer, numbytes) < 0)
+            {
+              printf("an error occured during the read\n", );
+              exit(-1);
+            }
             close(fd);
             // at += len;
             // offset += len;
@@ -393,7 +398,7 @@ write_output * write_file_1_svc(write_input *inp, struct svc_req *rqstp) {
         // file doesn't exist
         snprintf(message, 512, "Error: file %s does not exist.", fi.filename);
     }*/
-    // strcpy(message,"testing write functionality");
+    strcpy(message,"testing write functionality");
     out.out_msg.out_msg_len = strlen(message) + 1;
     out.out_msg.out_msg_val = strdup(message);
     // free(&message);
