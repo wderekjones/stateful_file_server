@@ -15,8 +15,6 @@
 */
 
 
-
-
 #define MAX_FILES 100 // The maximum number of files in the filesystem.
 #define MAX_PAGES 8 // The maximum number of pages per file.
 #define BLOCK_SIZE 512 // Blocks are 512 bytes.
@@ -77,17 +75,22 @@ int file_exists(char *username, char *filename) {
     return exists;
 }
 
-// Get information on a file.  Takes the username, file descriptor, and a pointer to a file_info struct.
-void get_file_info(char *username, int target_fd, file_info *fi) {
-    int fd, exists;
+
+// Get the file name from file descriptor.  Takes the username, file descriptor.
+char * get_file_name(char *username, int target_fd) {
+    int fd;
+    int exists = 0;
+    char filebuf[10];
+    char *fp = filebuf;
+    file_info fi;
     fd = open("files.dat", O_RDONLY);
-    for (exists = 0; read(fd, fi, sizeof(file_info)) > 0;) {
-        if ((strcmp(username, fi->username) == 0) && (strcmp(target_fd, fi->fd) == 0)) {
-            exists = 1;
-            break;
+    for (exists = 0; read(fd, &fi, sizeof(file_info)) > 0;) {
+        if ((strcmp(username, fi.username) == 0) && ((target_fd == fi.fd) == 1)) {
+            strcpy(fp,fi.filename);
         }
     }
     close(fd);
+    return fp;
 }
 
 // Commit changes to a file_info struct.  Takes only a file_info struct pointer as input.
@@ -124,6 +127,7 @@ int add_file(file_info fi) {
     }
     // insert file
     if (found) {
+        // why is the buffer allowed to be negative?
         lseek(fd, -sizeof(fi), SEEK_CUR);
         printf("write %zd\n", write(fd, &fi, sizeof(fi)));
     }
@@ -143,6 +147,7 @@ void file_list(char *username, char *buffer) {
         if (strcmp(username, fi.username) == 0) {
             strcat(buffer, " ");
             strcat(buffer, fi.filename);
+              // add things here to change the output of the file list
         }
     }
     close(fd);
@@ -207,6 +212,7 @@ open_output * open_file_1_svc(open_input *inp, struct svc_req *b)
         strcpy(fi.username, inp->user_name);
         strcpy(fi.filename, inp->file_name);
         fi.used = 1;
+        fi.fd = fd;
         page = get_free_page();
 
         if (page != -1)
@@ -220,7 +226,8 @@ open_output * open_file_1_svc(open_input *inp, struct svc_req *b)
 
         if (add_file(fi))
         {
-            snprintf(message, 512, "%s created for user %s", inp->file_name, inp->user_name);
+            // snprintf(message, 512, "%s created for user %s", inp->file_name, inp->user_name);
+            printf(message, 512, "%s created for user %s", inp->file_name, inp->user_name);
             out.fd = fd;
         }
         else
@@ -244,60 +251,62 @@ open_output * open_file_1_svc(open_input *inp, struct svc_req *b)
 read_output * read_file_1_svc(read_input *inp, struct svc_req *rqstp)
 {
     // TODO: keep track of current position using a static variable?....
-    char *buffer;
     char message[512];
+    char *buffer = message;
+
     // offset is where to begin the read, at is the current position of the client from previous reads
     int offset, numbytes, at, page_index, page_num, len, fd, buffer_size, message_size, read_fail;
-    file_info *fi;
+    file_info fi;
 
     // get_file_info(inp->user_name,inp->fd,fi);
 
     printf("read_file_1_svc: (user_name = %s, fd = %i, numbytes = %i)\n",
            inp->user_name, inp->fd, inp->numbytes);
     static read_output out;
-    // /*
-    if (file_exists(inp->user_name, fi->filename))
+    char *file_name = get_file_name(inp->user_name,inp->fd);
+    strcpy(fi.filename,file_name);
+    if (file_exists(inp->user_name, fi.filename))
     {
         // offset = inp->offset;
-        offset = 0;
+        // offset = 0;
         numbytes = inp->numbytes;
-        at = 0;
-        buffer_size = numbytes + 1;
-        buffer = malloc(buffer_size);
-        memset(buffer, 0, buffer_size);
-        char *reply = "Content read: ";
-        message_size = strlen(reply) + buffer_size;
-        get_file_info(inp->user_name, inp->fd, &fi);
-        read_fail = 0;
+        printf("number of bytes to read: %i\n", numbytes);
+        // at = 0;
+        // buffer_size = numbytes + 1;
+        // buffer = malloc(buffer_size);
+        // memset(buffer, 0, buffer_size);
+        // char *reply = "Content read: ";
+        // message_size = strlen(reply) + buffer_size;
+        // get_file_info(inp->user_name, inp->fd, &fi);
+        // read_fail = 0;
 
-        while (at < numbytes) {
-            printf("at = %d\n", at);
-            page_index = offset / PAGE_SIZE;
-            if (page_index >= fi->used) {
-                read_fail = 1;
-                break;
-            }
+        // while (at < numbytes) {
+            // printf("at = %d\n", at);
+            // page_index = offset / PAGE_SIZE;
+            // if (page_index >= fi->used) {
+                // read_fail = 1;
+                // break;
+            // }
 
-            page_num = fi->pages[page_index];
-            if ((numbytes - at) < (PAGE_SIZE - (offset % PAGE_SIZE))) {
-                len = numbytes - at;
-            } else {
-                len = PAGE_SIZE - (offset % PAGE_SIZE);
-            }
+            // page_num = fi->pages[page_index];
+            // if ((numbytes - at) < (PAGE_SIZE - (offset % PAGE_SIZE))) {
+                // len = numbytes - at;
+            // } else {
+                // len = PAGE_SIZE - (offset % PAGE_SIZE);
+            // }
 
             fd = open("disk.dat", O_RDONLY);
-
-
             // move to the current page that the file is being edited on
-            // lseek(fd, (PAGE_SIZE * page_num), SEEK_SET);
+            lseek(fd, (PAGE_SIZE * page_num), SEEK_SET);
 
-            // printf("len = %d\n", len);
-            read(fd, buffer+at, len);
+            printf("len = %d\n", len);
+            read(fd, buffer, numbytes);
             close(fd);
-            at += len;
-            offset += len;
+            // at += len;
+            // offset += len;
+            // strncpy(message,buffer,512);
             printf("%s\n", buffer);
-        }
+        // }
         // buffer[numbytes] = '\x00';
         // if (read_fail) {
             // message = malloc(512);
@@ -310,13 +319,15 @@ read_output * read_file_1_svc(read_input *inp, struct svc_req *rqstp)
             // snprintf(message, message_size, "Content read: %s", buffer);
             // printf("%s\n", message);
         // }
-    }
+    // }
     // else {
         // message = malloc(512);
         // snprintf(message, 512, "Error: file %s does not exist.", fi->filename);
-    // }
-    // out.out_msg.out_msg_len = strlen(message) + 1;
-    // out.out_msg.out_msg_val = strdup(message);
+    }
+    // strncpy(message,fi.filename,512);
+    strncpy(message,buffer,512);
+    out.out_msg.out_msg_len = strlen(message) + 1;
+    out.out_msg.out_msg_val = strdup(message);
     // free(buffer);
     // free(message);
     // printf("%s (%d)\n", out.out_msg.out_msg_val, out.out_msg.out_msg_len);
@@ -330,58 +341,64 @@ write_output * write_file_1_svc(write_input *inp, struct svc_req *rqstp) {
     char *buffer;
     file_info fi;
     int fd, numbytes, offset, size, at, page_index, page_num, len;
-    /*
-    printf("write_file_1_svc: (user_name = '%s', file_name = '%s' offset = %d numbytes = %d)\n",
-           inp->user_name, inp->file_name, inp->offset, inp->numbytes);
+
+    printf("write_file_1_svc: (user_name = '%s', file_descriptor = '%i' numbytes = %d)\n",
+           inp->user_name, inp->fd, inp->numbytes);
     printf("write buffer: %s\n", inp->buffer.buffer_val);
     static write_output out;
-
-    if (file_exists(inp->user_name, inp->file_name)) {
-        numbytes = inp->numbytes < strlen(inp->buffer.buffer_val) ? inp->numbytes : strlen(inp->buffer.buffer_val);
+    char *file_name = get_file_name(inp->user_name,inp->fd);
+    printf("%s\n", file_name);
+  /*  strcpy(fi.filename,file_name);
+    if (file_exists(inp->user_name, *file_name)) {
+        // numbytes = inp->numbytes < strlen(inp->buffer.buffer_val) ? inp->numbytes : strlen(inp->buffer.buffer_val);
+        numbytes = inp->numbytes;
         buffer = inp->buffer.buffer_val;
-        get_file_info(inp->user_name, inp->fd, inp->file_name, &fi);
-        if (inp->offset > (fi.used * PAGE_SIZE - 1)) {
-            printf("used = %d\n", fi.used);
-            snprintf(message, 512, "Error: writing past end of file.");
-        } else if ((inp->offset + numbytes) > (PAGE_SIZE * MAX_PAGES)) {
-            snprintf(message, 512, "Error: write is too large.");
-        } else {
-            offset = inp->offset;
-            at = 0;
-            while (at < numbytes) {
-                page_index = offset / PAGE_SIZE;
-                if (page_index == fi.used) {
-                    page_num = get_free_page();
-                    fi.pages[fi.used] = page_num;
-                    fi.used++;
-                    change_file_info(&fi);
-                } else {
-                    page_num = fi.pages[page_index];
-                }
-                if ((numbytes - at) < (PAGE_SIZE - (offset % PAGE_SIZE))) {
-                    len = numbytes - at;
-                } else {
-                    len = PAGE_SIZE - (offset % PAGE_SIZE);
-                }
-                fd = open("disk.dat", O_RDWR);
-                printf("lseek to %d\n", (PAGE_SIZE * page_num) + (offset % PAGE_SIZE));
-                printf("%d %d %d\n", PAGE_SIZE, page_num, offset%PAGE_SIZE);
-                lseek(fd, (PAGE_SIZE * page_num) + (offset % PAGE_SIZE), SEEK_SET);
-                write(fd, buffer+at, len);
-                close(fd);
-                at += len;
-                offset += len;
+        printf("used = %d\n", fi.used);
+
+        at = 0;
+        // while (at < numbytes) {
+            // page_index = offset / PAGE_SIZE;
+            if (page_index == fi.used)
+            {
+              page_num = get_free_page();
+              fi.pages[fi.used] = page_num;
+              fi.used++;
+              change_file_info(&fi);
+              page_num = fi.pages[page_index];
             }
-            snprintf(message, 512, "%d characters written to file %s", numbytes, inp->file_name);
+
+            if ((numbytes - at) < (PAGE_SIZE - (offset % PAGE_SIZE)))
+            {
+                len = numbytes - at;
+            }
+            else
+            {
+                    len = PAGE_SIZE - (offset % PAGE_SIZE);
+            }
+            fd = open("disk.dat", O_RDWR);
+            lseek(fd, (PAGE_SIZE * page_num), SEEK_SET);
+
+            printf("lseek to %d\n", (PAGE_SIZE * page_num) + (offset % PAGE_SIZE));
+            printf("%d %d %d\n", PAGE_SIZE, page_num, offset%PAGE_SIZE);
+            // lseek(fd, (PAGE_SIZE * page_num) + (offset % PAGE_SIZE), SEEK_SET);
+            write(fd, buffer+at, len);
+            close(fd);
+            at += len;
+
+            snprintf(message, 512, "%d characters written to file %s", numbytes, fi.filename);
         }
-    } else {
+    // }
+    else
+    {
         // file doesn't exist
-        snprintf(message, 512, "Error: file %s does not exist.", inp->file_name);
-    }
+        snprintf(message, 512, "Error: file %s does not exist.", fi.filename);
+    }*/
+    // strcpy(message,"testing write functionality");
     out.out_msg.out_msg_len = strlen(message) + 1;
     out.out_msg.out_msg_val = strdup(message);
+    // free(&message);
     return &out;
-    */
+
 }
 
 
