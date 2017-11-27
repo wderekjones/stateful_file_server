@@ -81,12 +81,14 @@ char * get_file_name(char *username, int target_fd) {
     int fd;
     int exists = 0;
     char filebuf[10];
-    char *fp = filebuf;
+    char *fp = malloc(512); // probably don't need this much space
+    memset(fp,0,512);
     file_info fi;
     fd = open("files.dat", O_RDONLY);
     for (exists = 0; read(fd, &fi, sizeof(file_info)) > 0;) {
         if ((strcmp(username, fi.username) == 0) && ((target_fd == fi.fd) == 1)) {
             strcpy(fp,fi.filename);
+            // printf("fi.filename: %s \t fp: %s\n", fi.filename, fp);
         }
     }
     close(fd);
@@ -252,7 +254,7 @@ read_output * read_file_1_svc(read_input *inp, struct svc_req *rqstp)
 {
     // TODO: when performing the read, need to check current position (read x bytes from [cur_pos - x] to [cur_pos])
     char message[512];
-    char *buffer = message;
+    char *buffer; // using a fixed buffer to make things easy, adjust this to allow one to write the entire file at once
 
     // offset is where to begin the read, at is the current position of the client from previous reads
     int offset, numbytes, at, page_index, page_num, len, fd, buffer_size, message_size, read_fail;
@@ -268,69 +270,72 @@ read_output * read_file_1_svc(read_input *inp, struct svc_req *rqstp)
     if (file_exists(inp->user_name, fi.filename))
     {
         // offset = inp->offset;
-        // offset = 0;
+        offset = 0;
         numbytes = inp->numbytes;
         printf("number of bytes to read: %i\n", numbytes);
-        // at = 0;
-        // buffer_size = numbytes + 1;
-        // buffer = malloc(buffer_size);
-        // memset(buffer, 0, buffer_size);
-        // char *reply = "Content read: ";
-        // message_size = strlen(reply) + buffer_size;
+        at = 0;
+        buffer_size = numbytes + 1;
+        buffer = malloc(buffer_size);
+        memset(buffer, 0, buffer_size);
+        char *reply = "Content read: ";
+        message_size = strlen(reply) + buffer_size;
         // get_file_info(inp->user_name, inp->fd, &fi);
-        // read_fail = 0;
+        read_fail = 0;
 
-        // while (at < numbytes) {
-            // printf("at = %d\n", at);
-            // page_index = offset / PAGE_SIZE;
-            // if (page_index >= fi->used) {
-                // read_fail = 1;
-                // break;
-            // }
+        while (at < numbytes) {
+            printf("at = %d\n", at);
+            page_index = offset / PAGE_SIZE;
+            if (page_index >= fi.used) {
+                read_fail = 1;
+                break;
+            }
 
-            // page_num = fi->pages[page_index];
-            // if ((numbytes - at) < (PAGE_SIZE - (offset % PAGE_SIZE))) {
-                // len = numbytes - at;
-            // } else {
-                // len = PAGE_SIZE - (offset % PAGE_SIZE);
-            // }
+            page_num = fi.pages[page_index];
+            if ((numbytes - at) < (PAGE_SIZE - (offset % PAGE_SIZE))) {
+                len = numbytes - at;
+            } else {
+                len = PAGE_SIZE - (offset % PAGE_SIZE);
+            }
+
 
             fd = open("disk.dat", O_RDONLY);
             // move to the current page that the file is being edited on
-            lseek(fd, (PAGE_SIZE * page_num), SEEK_SET);
+            // lseek(fd, (PAGE_SIZE * page_num), SEEK_SET);
+            printf("PAGE_SIZE = %d \t page_num = %d\n",PAGE_SIZE, page_num );
+            lseek(fd,(PAGE_SIZE * page_num), SEEK_CUR);
 
-            // printf("len = %d\n", len);
+            printf("len = %d\n", len);
             if(
             read(fd, buffer, numbytes) < 0)
             {
-              printf("an error occured during the read\n", );
+              printf("an error occured during the read\n");
               exit(-1);
             }
             close(fd);
-            // at += len;
-            // offset += len;
-            // strncpy(message,buffer,512);
+            at += len;
+            offset += len;
+            strncpy(message,buffer,512);
             printf("%s\n", buffer);
-        // }
-        // buffer[numbytes] = '\x00';
-        // if (read_fail) {
+        }
+        buffer[numbytes] = '\x00';
+        if (read_fail) {
             // message = malloc(512);
-            // snprintf(message, 512, "Error: writing past end of file.");
-            // printf("%s\n", message);
-        // }
-        // else {
+            snprintf(message, 512, "Error: writing past end of file.");
+            printf("%s\n", message);
+        }
+        else {
             // message = malloc(message_size);
-            // memset(message, 0, message_size);
-            // snprintf(message, message_size, "Content read: %s", buffer);
-            // printf("%s\n", message);
-        // }
-    // }
-    // else {
+            memset(message, 0, message_size);
+            snprintf(message, message_size, "Content read: %s", buffer);
+            printf("%s\n", message);
+        }
+    }
+    else {
         // message = malloc(512);
-        // snprintf(message, 512, "Error: file %s does not exist.", fi->filename);
+        snprintf(message, 512, "Error: file %s does not exist.", fi.filename);
     }
     // strncpy(message,fi.filename,512);
-    strncpy(message,buffer,512);
+    // strncpy(message,buffer,512);
     out.out_msg.out_msg_len = strlen(message) + 1;
     out.out_msg.out_msg_val = strdup(message);
     // free(buffer);
@@ -352,9 +357,11 @@ write_output * write_file_1_svc(write_input *inp, struct svc_req *rqstp) {
     printf("write buffer: %s\n", inp->buffer.buffer_val);
     static write_output out;
     char *file_name = get_file_name(inp->user_name,inp->fd);
-    printf("%s\n", file_name);
-  /*  strcpy(fi.filename,file_name);
-    if (file_exists(inp->user_name, *file_name)) {
+    printf("file_name: %s\n", file_name);
+    printf("user_name: %s\n", inp->user_name);
+    // strcpy(fi.filename,file_name);
+    // printf("fi.filename: %s \t file_name: %s", fi.filename, file_name);
+    if (file_exists(inp->user_name, file_name)) {
         // numbytes = inp->numbytes < strlen(inp->buffer.buffer_val) ? inp->numbytes : strlen(inp->buffer.buffer_val);
         numbytes = inp->numbytes;
         buffer = inp->buffer.buffer_val;
@@ -397,8 +404,8 @@ write_output * write_file_1_svc(write_input *inp, struct svc_req *rqstp) {
     {
         // file doesn't exist
         snprintf(message, 512, "Error: file %s does not exist.", fi.filename);
-    }*/
-    strcpy(message,"testing write functionality");
+    }
+    // strcpy(message,"testing write functionality");
     out.out_msg.out_msg_len = strlen(message) + 1;
     out.out_msg.out_msg_val = strdup(message);
     // free(&message);
