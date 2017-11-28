@@ -216,6 +216,7 @@ void file_list(char *username, char *buffer) {
     close(fd);
 }
 
+
 // Free a page with given page number by setting its entry in the page table to 0.
 void free_page(int page_index) {
     int fd;
@@ -254,6 +255,49 @@ int file_delete(char *username, char *filename) {
 }
 
 
+int file_close(char* username, int close_fd)
+{
+  int fd;
+  int found = -1;
+  file_info fi;
+
+  fd = open("files.dat", O_RDWR);
+  for (found=0; read(fd, &fi, sizeof(fi)) >0;){
+    if ((strcmp(username, fi.username) ==0) && (close_fd == fi.fd) == 1)
+    {
+      found = 1; //update the success flag
+      fi.fd = -2; //update file_descriptor to signify closed file.
+      change_file_info(&fi); // update files.dat
+    }
+  }
+
+  return found; // 1 for success, -1 for failure
+}
+
+
+// int get_file_closed(char* username, int close_fd)
+// {
+  // int fd;
+  // int found = -1;
+  // file_info fi;
+
+  // fd = open("files.dat", O_RDWR);
+  // for (found=0; read(fd, &fi, sizeof(fi)) >0;){
+    // if ((strcmp(username, fi.username) ==0) && (close_fd == fi.fd) == 1)
+    // {
+      // fd = fi.fd;
+    // }
+  // }
+  // if (fd < 0)
+  // {
+    // return 1;
+  // }
+  // else
+  // {
+    // return 0;
+  // }
+// }
+
 // RPC call "open".
 open_output * open_file_1_svc(open_input *inp, struct svc_req *rqstp)
 {
@@ -290,7 +334,6 @@ open_output * open_file_1_svc(open_input *inp, struct svc_req *rqstp)
 
         if (add_file(fi))
         {
-            // snprintf(message, 512, "%s created for user %s", inp->file_name, inp->user_name);
             printf(message, 512, "%s created for user %s", inp->file_name, inp->user_name);
             out.fd = fd;
         }
@@ -520,14 +563,12 @@ delete_output * delete_file_1_svc(delete_input *inp, struct svc_req *rqstp)
 close_output * close_file_1_svc(close_input *inp, struct svc_req *rqstp)
 {
   char message[512];
-  int success = 0;
-  success = close(inp->fd);
   char* filename;
-  strcpy(filename, get_file_name(inp->user_name, inp->fd));
-  printf("user '%s' closed file: '%s' \n", inp->user_name, filename);
+  file_close(inp->user_name,inp->fd);
+  // printf("user '%s' closed file: '%s' \n", inp->user_name, filename);
   snprintf(message,512, "user '%s' closed file: '%i'", inp->user_name, inp->fd);
   static close_output out;
-  out.out_msg.out_msg_len = strlen(message) + 1;
   out.out_msg.out_msg_val = strdup(message);
+  out.out_msg.out_msg_len = strlen(message) + 1;
   return &out;
 }

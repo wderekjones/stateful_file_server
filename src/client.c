@@ -336,14 +336,14 @@ void main(int argc, char **argv)
   for (i=0; i< 20;i++){
   Write(fd1, "funny contents in the file 1", 15, cl);
   }
-  // Close(fd1, cl);
+  Close(fd1, cl);
 
   fd2=Open("File2", cl);
   for (j=0; j< 20;j++){
   Read(fd2, buffer, 10, cl);
   printf("%s\n",buffer);
   }
-  // Close(fd2, cl);
+  Close(fd2, cl);
   Delete("File1",cl);
   List(cl);
 }
