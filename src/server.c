@@ -29,6 +29,46 @@ struct file_info { // Holds the file information.
 }; // End of struct file_info.
 typedef struct file_info file_info; // Define as a type.
 
+struct open_file_list { // contains a list of the open files
+  struct {
+		int fd_table_val[1000];
+	}fd_table;
+};
+typedef struct open_file_list open_file_list;
+
+
+void init_open_file_list(open_file_list *ofl)
+{
+  for (int i =0; i < sizeof(ofl->fd_table.fd_table_val); i++)
+  {
+    ofl->fd_table.fd_table_val[i] = -1; //default value to denote empty space
+  }
+}
+
+void add_to_file_list(int fd, open_file_list *ofl)
+{
+  for (int i =0; i < sizeof(ofl->fd_table.fd_table_val); i++)
+  {
+    if(ofl->fd_table.fd_table_val[i] < 0)
+    {
+      ofl->fd_table.fd_table_val[i] = fd;
+    }
+  }
+}
+
+
+int check_file_list(int fd, open_file_list *ofl)
+{
+  for (int i=0; i < sizeof(ofl->fd_table.fd_table_val); i++)
+  {
+    if(ofl->fd_table.fd_table_val[i] == fd)
+    {
+      return 1; // return that the file was successfully found in the table
+    }
+  }
+  return 0; // all other cases did not find the file
+}
+
 // Initializes the virtual disk files if they do not all exist already.
 int init_disk() {
     if ((access("files.dat", F_OK) == 0) && (access("pages.dat", F_OK) == 0) && (access("disk.dat", F_OK) == 0)) {
@@ -94,6 +134,27 @@ char * get_file_name(char *username, int target_fd) {
     close(fd);
     return fp;
 }
+
+// get file descriptor from file name
+int get_file_desc(char *username, char *filename) {
+    int fd;
+    int out_fd = -1;
+    int exists = 0;
+    char filebuf[10];
+    char *fp = malloc(512); // probably don't need this much space
+    memset(fp,0,512);
+    file_info fi;
+    fd = open("files.dat", O_RDONLY);
+    for (exists = 0; read(fd, &fi, sizeof(file_info)) > 0;) {
+        if ((strcmp(username, fi.username) == 0) && ((filename == fi.filename) == 1)) {
+          out_fd = fi.fd;
+        }
+    }
+    close(fd);
+    return out_fd;
+}
+
+
 
 // Commit changes to a file_info struct.  Takes only a file_info struct pointer as input.
 void change_file_info(file_info *fi) {
@@ -194,10 +255,11 @@ int file_delete(char *username, char *filename) {
 
 
 // RPC call "open".
-open_output * open_file_1_svc(open_input *inp, struct svc_req *b)
+open_output * open_file_1_svc(open_input *inp, struct svc_req *rqstp)
 {
-    // TODO: need to check that home directory of inp->user_name exists, if not then create it
-    // TODO: check that newly created file is allocated 64 blocks
+
+    // TODO: check to see if file exists, if it does than get its file descriptor and reuse it
+    // TODO: once file has been opened, check to see if its descriptor is contained in the file table else add it
     int page;
     file_info fi;
     char message[512];
@@ -251,8 +313,11 @@ open_output * open_file_1_svc(open_input *inp, struct svc_req *b)
 
 // RPC call "read".
 read_output * read_file_1_svc(read_input *inp, struct svc_req *rqstp)
+// read_output * read_file_1_svc(read_input *inp)
 {
+    // TODO: check open file table to s
     // TODO: when performing the read, need to check current position (read x bytes from [cur_pos - x] to [cur_pos])
+
     char message[512];
     char *buffer; // using a fixed buffer to make things easy, adjust this to allow one to write the entire file at once
 
@@ -346,7 +411,8 @@ read_output * read_file_1_svc(read_input *inp, struct svc_req *rqstp)
 
 
 // RPC call "write".
-write_output * write_file_1_svc(write_input *inp, struct svc_req *rqstp) {
+write_output * write_file_1_svc(write_input *inp, struct svc_req *rqstp)
+{
     char message[512];
     char *buffer;
     file_info fi;
@@ -456,8 +522,10 @@ close_output * close_file_1_svc(close_input *inp, struct svc_req *rqstp)
   char message[512];
   int success = 0;
   success = close(inp->fd);
-  printf("user '%s' deleted file: '%i'", inp->user_name, inp->fd);
-  snprintf(message,512, "user '%s' deleted file: '%i'", inp->user_name, inp->fd);
+  char* filename;
+  strcpy(filename, get_file_name(inp->user_name, inp->fd));
+  printf("user '%s' closed file: '%s' \n", inp->user_name, filename);
+  snprintf(message,512, "user '%s' closed file: '%i'", inp->user_name, inp->fd);
   static close_output out;
   out.out_msg.out_msg_len = strlen(message) + 1;
   out.out_msg.out_msg_val = strdup(message);

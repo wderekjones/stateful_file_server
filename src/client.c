@@ -7,7 +7,7 @@
 #include <readline/history.h> // Needed for prompt history
 #include <pwd.h> // Need to get username.
 
-int main(int argc, char **argv)
+/*int main(int argc, char **argv)
 {
     CLIENT *cl; // Pointer to the client handle.
 
@@ -200,4 +200,150 @@ int main(int argc, char **argv)
     }
     printf("\n"); // Make terminal look nice.
     exit(0); // End the program with no error.
+}
+*/
+// CLIENT *cl; // Pointer to the client handle.
+
+
+int Open(char *filename, CLIENT *cl)
+{
+  char * username = getpwuid(getuid())->pw_name; // Get the user's username.
+  open_input in; // Input struct for the RPC call.
+  strcpy(in.user_name, username); // Copy user name.
+  strcpy(in.file_name, filename);
+  open_output *outp = open_file_1(&in, cl); // And call the create file RPC.      // if (outp == NULL)
+
+  if (outp == NULL)
+  {
+    printf("open unsuccessful. \n");
+  }
+  return outp->fd;
+}
+
+
+
+void Read(int fd, char *buffer, int numbytes, CLIENT *cl)
+{
+  char * username = getpwuid(getuid())->pw_name; // Get the user's username.
+  read_input in;
+  strcpy(in.user_name, username); // Copy user name.
+  in.fd = fd; // get the file descriptor and store inside of the input structure
+  in.numbytes = numbytes; // get the number of bytes and store inside of the input structure
+  read_output *outp = read_file_1(&in, cl); // And call the read file RPC.
+  strcpy(buffer,outp->out_msg.out_msg_val); // deep copy the read result to the buffer
+  if (outp == NULL)
+  {
+    printf("read unsuccessful. \n");
+  }
+  else
+  {
+    printf("%s\n", outp->out_msg.out_msg_val);
+  }
+}
+
+void Write(int fd, char *buffer, int numbytes, CLIENT *cl)
+{
+  char * username = getpwuid(getuid())->pw_name; // Get the user's username.
+  write_input in;
+  strcpy(in.user_name, username); // Copy user name.
+  in.fd = fd;
+  in.numbytes = numbytes; // The number of bytes to write.
+  in.buffer.buffer_val = strdup(buffer);
+  in.buffer.buffer_len = strlen(buffer);
+  write_output *outp = write_file_1(&in, cl); // And call the create file RPC.
+  if (outp == NULL)
+  {
+    printf("write unsuccessful.\n");
+  }
+  else
+  {
+    printf("%s\n", outp->out_msg.out_msg_val);
+  }
+}
+
+void Close(int fd, CLIENT *cl)
+{
+  char * username = getpwuid(getuid())->pw_name; // Get the user's username.
+  close_input in;
+  in.fd = fd;
+  strcpy(in.user_name, username); // Copy user name.
+  close_output *outp = close_file_1(&in, cl); // And call the close file RPC.
+  if (outp == NULL)
+  {
+    printf("close unsuccessful.\n");
+  }
+  else
+  {
+    printf("%s\n", outp->out_msg.out_msg_val);
+  }
+}
+
+void Delete(char *filename, CLIENT *cl)
+{
+  char * username = getpwuid(getuid())->pw_name; // Get the user's username.
+  delete_input in;
+  strcpy(in.user_name, username); // Copy user name.
+  strcpy(in.file_name, filename); // Copy file name.
+  delete_output *outp = delete_file_1(&in, cl); // And call the delete file RPC.
+  if (outp == NULL)
+  {
+    printf("delete unsuccessful. \n");
+  }
+  else
+  {
+    printf("%s\n", outp->out_msg.out_msg_val);
+  }
+}
+
+void List(CLIENT *cl)
+{
+  char * username = getpwuid(getuid())->pw_name; // Get the user's username.
+  list_input in; // Input struct for the RPC call.
+  strcpy(in.user_name, username); // Copy user name.
+  list_output *outp = list_files_1(&in, cl); // And call the list file RPC.
+  if (outp == NULL)
+  { // If the RPC call fails...
+    printf("list unsuccessful. \n" );
+  }
+  else
+  {
+    printf("%s\n", outp->out_msg.out_msg_val);
+  }
+}
+
+
+void main(int argc, char **argv)
+{
+  if (argc != 2)
+  { // If the user doesn't enter the correct number of parameters...
+      fprintf(stderr, "usage: %s <hostname>\n", argv[0]); // Print out usage information.
+      exit(1); // And exit with an error code.
+  }
+  CLIENT *cl; // Pointer to the client handle.
+  cl = clnt_create(argv[1], SSNFSPROG, SSNFSVER, "tcp"); // Create the RPC client.
+  if (cl == NULL)
+  { // If there was an error creating the client...
+      fprintf(stderr, "getting client handle failed"); // Report an error message.
+      exit(2); // And exit with an error code.
+  }
+
+
+
+  int i,j,k;
+  int fd1,fd2,fd3;
+  char buffer[100];
+  fd1=Open("File1", cl); // opens the file
+  for (i=0; i< 20;i++){
+  Write(fd1, "funny contents in the file 1", 15, cl);
+  }
+  // Close(fd1, cl);
+
+  fd2=Open("File2", cl);
+  for (j=0; j< 20;j++){
+  Read(fd2, buffer, 10, cl);
+  printf("%s\n",buffer);
+  }
+  // Close(fd2, cl);
+  Delete("File1",cl);
+  List(cl);
 }
