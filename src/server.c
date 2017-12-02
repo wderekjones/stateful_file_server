@@ -5,15 +5,7 @@
 #include <unistd.h> // Needed for access, etc.
 #include <fcntl.h> // Needed for ftruncate, etc.
 #include <errno.h> // Need for errno, strerror, etc.
-
-
-
-/*
-
-    Look at the implementation of read and write from the example code
-
-*/
-
+#include <stdlib.h>
 
 #define MAX_FILES 100 // The maximum number of files in the filesystem.
 #define MAX_PAGES 8 // The maximum number of pages per file.
@@ -121,12 +113,12 @@ char * get_file_name(char *username, int target_fd) {
     int fd;
     int exists = 0;
     char filebuf[10];
-    char *fp = malloc(512); // probably don't need this much space
-    memset(fp,0,512);
+    char *fp = filebuf;
     file_info fi;
     fd = open("files.dat", O_RDONLY);
-    for (exists = 0; read(fd, &fi, sizeof(file_info)) > 0;) {
+    for (exists = 0; read(fd, &fi, sizeof(fi)) > 0;) {
         if ((strcmp(username, fi.username) == 0) && ((target_fd == fi.fd) == 1)) {
+            // strcpy(filebuf,fi.filename);
             strcpy(fp,fi.filename);
             // printf("fi.filename: %s \t fp: %s\n", fi.filename, fp);
         }
@@ -216,7 +208,6 @@ void file_list(char *username, char *buffer) {
     close(fd);
 }
 
-
 // Free a page with given page number by setting its entry in the page table to 0.
 void free_page(int page_index) {
     int fd;
@@ -255,48 +246,48 @@ int file_delete(char *username, char *filename) {
 }
 
 
-int file_close(char* username, int close_fd)
-{
-  int fd;
-  int found = -1;
-  file_info fi;
-
-  fd = open("files.dat", O_RDWR);
-  for (found=0; read(fd, &fi, sizeof(fi)) >0;){
-    if ((strcmp(username, fi.username) ==0) && (close_fd == fi.fd) == 1)
-    {
-      found = 1; //update the success flag
-      fi.fd = -2; //update file_descriptor to signify closed file.
-      change_file_info(&fi); // update files.dat
+// closes a file owned by a user given the file descriptor value of the target file
+void file_close(char *username, int target_fd) {
+    int fd;
+    int found, i;
+    file_info fi;
+    // search for file's file info block
+    fd = open("files.dat", O_RDWR);
+    for (found = 0; read(fd, &fi, sizeof(fi)) > 0;) {
+        if ((strcmp(username, fi.username) == 0) && (target_fd == fi.fd)) {
+            found = 1;
+            fi.fd = -2; // this denotes that the file has been closed
+            change_file_info(&fi); // commit the changes
+            break;
+        }
     }
-  }
-
-  return found; // 1 for success, -1 for failure
+    close(fd);
+    // return success
 }
 
 
-// int get_file_closed(char* username, int close_fd)
-// {
-  // int fd;
-  // int found = -1;
-  // file_info fi;
+int get_file_status(char *username, char* filename)
+{
+   int fd;
+   int found, i;
+   file_info fi;
+   // search for file's file info block
+   fd = open("files.dat", O_RDWR);
+   for (found = 0; read(fd, &fi, sizeof(fi)) > 0;) {
+     printf("%i\n", i);
+       if ((strcmp(username, fi.username) == 0) && (strcmp(filename, fi.filename) == 0))
+       {
+           found = 1;
+           return fi.fd;
+          // break;
+       }
+       i++;
+   }
+   close(fd);
+   // return success
+   return fi.fd;
+}
 
-  // fd = open("files.dat", O_RDWR);
-  // for (found=0; read(fd, &fi, sizeof(fi)) >0;){
-    // if ((strcmp(username, fi.username) ==0) && (close_fd == fi.fd) == 1)
-    // {
-      // fd = fi.fd;
-    // }
-  // }
-  // if (fd < 0)
-  // {
-    // return 1;
-  // }
-  // else
-  // {
-    // return 0;
-  // }
-// }
 
 // RPC call "open".
 open_output * open_file_1_svc(open_input *inp, struct svc_req *rqstp)
@@ -334,7 +325,7 @@ open_output * open_file_1_svc(open_input *inp, struct svc_req *rqstp)
 
         if (add_file(fi))
         {
-            printf(message, 512, "%s created for user %s", inp->file_name, inp->user_name);
+            printf("%s created for user %s\n", inp->file_name, inp->user_name);
             out.fd = fd;
         }
         else
@@ -349,7 +340,10 @@ open_output * open_file_1_svc(open_input *inp, struct svc_req *rqstp)
     }
 
     // increment the file descriptor for the next call and return the output file descriptor
-    fd +=1;
+    if (out.fd != -1)
+    {
+      fd +=1;
+    }
     return &out;
 }
 
@@ -367,6 +361,7 @@ read_output * read_file_1_svc(read_input *inp, struct svc_req *rqstp)
     // offset is where to begin the read, at is the current position of the client from previous reads
     int offset, numbytes, at, page_index, page_num, len, fd, buffer_size, message_size, read_fail;
     file_info fi;
+    static int cur_pos = 0;
 
     // get_file_info(inp->user_name,inp->fd,fi);
 
@@ -375,7 +370,7 @@ read_output * read_file_1_svc(read_input *inp, struct svc_req *rqstp)
     static read_output out;
     char *file_name = get_file_name(inp->user_name,inp->fd);
     strcpy(fi.filename,file_name);
-    if (file_exists(inp->user_name, fi.filename))
+    if (file_exists(inp->user_name, fi.filename) && (get_file_status(inp->user_name, file_name) > 0))
     {
         // offset = inp->offset;
         offset = 0;
@@ -456,6 +451,9 @@ read_output * read_file_1_svc(read_input *inp, struct svc_req *rqstp)
 // RPC call "write".
 write_output * write_file_1_svc(write_input *inp, struct svc_req *rqstp)
 {
+
+    // check
+
     char message[512];
     char *buffer;
     file_info fi;
@@ -468,10 +466,8 @@ write_output * write_file_1_svc(write_input *inp, struct svc_req *rqstp)
     char *file_name = get_file_name(inp->user_name,inp->fd);
     printf("file_name: %s\n", file_name);
     printf("user_name: %s\n", inp->user_name);
-    // strcpy(fi.filename,file_name);
-    // printf("fi.filename: %s \t file_name: %s", fi.filename, file_name);
-    if (file_exists(inp->user_name, file_name)) {
-        // numbytes = inp->numbytes < strlen(inp->buffer.buffer_val) ? inp->numbytes : strlen(inp->buffer.buffer_val);
+    printf("file_status: %d\n", get_file_status(inp->user_name, file_name));
+    if (file_exists(inp->user_name, file_name) && (get_file_status(inp->user_name, file_name) > 0)) {
         numbytes = inp->numbytes;
         buffer = inp->buffer.buffer_val;
         printf("used = %d\n", fi.used);
@@ -563,12 +559,14 @@ delete_output * delete_file_1_svc(delete_input *inp, struct svc_req *rqstp)
 close_output * close_file_1_svc(close_input *inp, struct svc_req *rqstp)
 {
   char message[512];
+  int status = -1;
   char* filename;
-  file_close(inp->user_name,inp->fd);
-  // printf("user '%s' closed file: '%s' \n", inp->user_name, filename);
-  snprintf(message,512, "user '%s' closed file: '%i'", inp->user_name, inp->fd);
+  // make call to function that searches the file table and changes the file descriptor of the input file to denote that it is closed
+  file_close(inp->user_name, inp->fd);
+  snprintf(message,512, "user '%s' closed: '%i'", inp->user_name, inp->fd);
+  printf("%s\n", message);
   static close_output out;
-  out.out_msg.out_msg_val = strdup(message);
   out.out_msg.out_msg_len = strlen(message) + 1;
+  out.out_msg.out_msg_val = strdup(message);
   return &out;
 }
