@@ -7,6 +7,7 @@
 #include <errno.h> // Need for errno, strerror, etc.
 #include <stdlib.h>
 
+
 #define MAX_FILES 100 // The maximum number of files in the filesystem.
 #define MAX_PAGES 8 // The maximum number of pages per file.
 #define BLOCK_SIZE 512 // Blocks are 512 bytes.
@@ -21,44 +22,63 @@ struct file_info { // Holds the file information.
 }; // End of struct file_info.
 typedef struct file_info file_info; // Define as a type.
 
-struct open_file_list { // contains a list of the open files
+struct server_state { // contains a list of the open files, position i corresponds to file descriptor i
   struct {
-		int fd_table_val[1000];
-	}fd_table;
+		int fd_state_val[100];
+	}fd_state;
+  struct {
+    char name_table_val[100][10]; // create an array of 100 elements to 10 element long strings
+  }name_table;
+  int head_pos[100]; // keep track of the current head positions for each of the files
 };
-typedef struct open_file_list open_file_list;
+typedef struct server_state server_state;
 
+server_state master_state; // may need to create a pointer and malloc some memory....
 
-void init_open_file_list(open_file_list *ofl)
+void update_state(file_info *fi, int is_open)
 {
-  for (int i =0; i < sizeof(ofl->fd_table.fd_table_val); i++)
-  {
-    ofl->fd_table.fd_table_val[i] = -1; //default value to denote empty space
-  }
-}
-
-void add_to_file_list(int fd, open_file_list *ofl)
-{
-  for (int i =0; i < sizeof(ofl->fd_table.fd_table_val); i++)
-  {
-    if(ofl->fd_table.fd_table_val[i] < 0)
-    {
-      ofl->fd_table.fd_table_val[i] = fd;
-    }
-  }
+  int key = fi->fd;
+  master_state.fd_state.fd_state_val[key] = is_open;
+  strcpy(master_state.name_table.name_table_val[key], fi->filename);
+  master_state.head_pos[key] = 0;
 }
 
 
-int check_file_list(int fd, open_file_list *ofl)
+char * get_file_name(int key)
 {
-  for (int i=0; i < sizeof(ofl->fd_table.fd_table_val); i++)
+  return master_state.name_table.name_table_val[key];
+}
+
+int get_file_status(int key)
+{
+  return master_state.fd_state.fd_state_val[key];
+}
+
+int get_file_offset(int key)
+{
+  return master_state.head_pos[key];
+}
+
+void set_file_offset(int key, int offset_val)
+{
+  master_state.head_pos[key] = offset_val;
+}
+
+void close_file_state(int key)
+{
+   master_state.fd_state.fd_state_val[key] = 0; // update the file descriptor to denote closed
+   master_state.head_pos[key] = 0; // reset the position of read/write head
+}
+
+int file_exists_in_state(int key)
+{
+  if(master_state.name_table.name_table_val[key] == NULL)
   {
-    if(ofl->fd_table.fd_table_val[i] == fd)
-    {
-      return 1; // return that the file was successfully found in the table
-    }
+      return 0;
   }
-  return 0; // all other cases did not find the file
+  else{
+    return 1;
+  }
 }
 
 // Initializes the virtual disk files if they do not all exist already.
@@ -95,6 +115,7 @@ int get_free_page() {
 // Checks if a file exists.  Return 0 on false, 1 on true.
 int file_exists(char *username, char *filename) {
     int fd, exists;
+    exists = 0;
     file_info fi;
     fd = open("files.dat", O_RDONLY);
     for (exists = 0; read(fd, &fi, sizeof(fi)) > 0;) {
@@ -105,26 +126,6 @@ int file_exists(char *username, char *filename) {
     }
     close(fd);
     return exists;
-}
-
-
-// Get the file name from file descriptor.  Takes the username, file descriptor.
-char * get_file_name(char *username, int target_fd) {
-    int fd;
-    int exists = 0;
-    char filebuf[10];
-    char *fp = filebuf;
-    file_info fi;
-    fd = open("files.dat", O_RDONLY);
-    for (exists = 0; read(fd, &fi, sizeof(fi)) > 0;) {
-        if ((strcmp(username, fi.username) == 0) && ((target_fd == fi.fd) == 1)) {
-            // strcpy(filebuf,fi.filename);
-            strcpy(fp,fi.filename);
-            // printf("fi.filename: %s \t fp: %s\n", fi.filename, fp);
-        }
-    }
-    close(fd);
-    return fp;
 }
 
 // get file descriptor from file name
@@ -266,35 +267,54 @@ void file_close(char *username, int target_fd) {
 }
 
 
-int get_file_status(char *username, char* filename)
-{
-   int fd;
-   int found, i;
-   file_info fi;
-   // search for file's file info block
-   fd = open("files.dat", O_RDWR);
-   for (found = 0; read(fd, &fi, sizeof(fi)) > 0;) {
-     printf("%i\n", i);
-       if ((strcmp(username, fi.username) == 0) && (strcmp(filename, fi.filename) == 0))
-       {
-           found = 1;
-           return fi.fd;
-          // break;
-       }
-       i++;
-   }
-   close(fd);
-   // return success
-   return fi.fd;
+void get_file_info(char *username, char *filename, file_info *fi) {
+    int fd, exists;
+    fd = open("files.dat", O_RDONLY);
+    for (exists = 0; read(fd, fi, sizeof(file_info)) > 0;) {
+        if ((strcmp(username, fi->username) == 0) && (strcmp(filename, fi->filename) == 0)) {
+            exists = 1;
+            break;
+        }
+    }
+    close(fd);
 }
 
+
+// this function searches for a closed file and assigns a new file descriptor so that it may be read/written to
+void open_closed_file(char* closed_username, char* closed_filename, int reopen_fd)
+{
+  file_info fi;
+  strcpy(fi.username, closed_username);
+  strcpy(fi.filename, closed_filename);
+  get_file_info(closed_username, closed_filename, &fi);
+  for (int i = 0; i < 100; i++)
+  {
+    if( (strcmp(master_state.name_table.name_table_val[i],closed_filename) == 0) && (master_state.fd_state.fd_state_val[i] == 0) )
+    {
+      master_state.fd_state.fd_state_val[i] = 1;
+    }
+  }
+  fi.fd = reopen_fd;
+  change_file_info(&fi);
+}
+
+int get_open_status_from_name(char* closed_filename)
+{
+  int status = 0;
+
+  for (int i = 0; i < 100; i++)
+  {
+    if(strcmp(master_state.name_table.name_table_val[i], closed_filename) ==0)
+    {
+      return master_state.fd_state.fd_state_val[i];
+    }
+  }
+  return status;
+}
 
 // RPC call "open".
 open_output * open_file_1_svc(open_input *inp, struct svc_req *rqstp)
 {
-
-    // TODO: check to see if file exists, if it does than get its file descriptor and reuse it
-    // TODO: once file has been opened, check to see if its descriptor is contained in the file table else add it
     int page;
     file_info fi;
     char message[512];
@@ -303,6 +323,7 @@ open_output * open_file_1_svc(open_input *inp, struct svc_req *rqstp)
     init_disk();
 
     printf("file exists %d\n", file_exists(inp->user_name, inp->file_name));
+    printf("get_open_status_from_name: %d\n", get_open_status_from_name(inp->file_name));
     static open_output out;
     out.fd = -1; // assume that the open call is unsuccessful in order to simplify
 
@@ -334,6 +355,10 @@ open_output * open_file_1_svc(open_input *inp, struct svc_req *rqstp)
         }
 
     }
+    else if (file_exists(inp->user_name,inp->file_name) && !(get_open_status_from_name(inp->file_name)))
+    {
+      strcpy(message,"Error: File has been closed.");
+    }
     else
     {
         strcpy(message, "Error: file already exists");
@@ -344,106 +369,83 @@ open_output * open_file_1_svc(open_input *inp, struct svc_req *rqstp)
     {
       fd +=1;
     }
+    change_file_info(&fi);
+    update_state(&fi,1);
     return &out;
 }
 
 
 // RPC call "read".
 read_output * read_file_1_svc(read_input *inp, struct svc_req *rqstp)
-// read_output * read_file_1_svc(read_input *inp)
 {
-    // TODO: check open file table to s
-    // TODO: when performing the read, need to check current position (read x bytes from [cur_pos - x] to [cur_pos])
-
-    char message[512];
-    char *buffer; // using a fixed buffer to make things easy, adjust this to allow one to write the entire file at once
-
-    // offset is where to begin the read, at is the current position of the client from previous reads
+    char *message, *buffer;
     int offset, numbytes, at, page_index, page_num, len, fd, buffer_size, message_size, read_fail;
     file_info fi;
-    static int cur_pos = 0;
-
-    // get_file_info(inp->user_name,inp->fd,fi);
-
+    init_disk();
     printf("read_file_1_svc: (user_name = %s, fd = %i, numbytes = %i)\n",
            inp->user_name, inp->fd, inp->numbytes);
     static read_output out;
-    char *file_name = get_file_name(inp->user_name,inp->fd);
+
+    // update the members of the file_info struct
+    char *file_name = get_file_name(inp->fd);
     strcpy(fi.filename,file_name);
-    if (file_exists(inp->user_name, fi.filename) && (get_file_status(inp->user_name, file_name) > 0))
+    strcpy(fi.username, inp->user_name);
+    fi.fd = inp->fd;
+    offset = get_file_offset(fi.fd); //set the file offset to the current value for the given file descriptor
+    if (file_exists(inp->user_name,file_name) && !(get_open_status_from_name(file_name)))
     {
-        // offset = inp->offset;
-        offset = 0;
+      strcpy(message,"Error: File has been closed.");
+    }
+    else if (file_exists_in_state(inp->fd) && (get_file_status(inp->fd) > 0)) {
         numbytes = inp->numbytes;
-        printf("number of bytes to read: %i\n", numbytes);
-        at = 0;
         buffer_size = numbytes + 1;
         buffer = malloc(buffer_size);
-        memset(buffer, 0, buffer_size);
         char *reply = "Content read: ";
         message_size = strlen(reply) + buffer_size;
-        // get_file_info(inp->user_name, inp->fd, &fi);
-        read_fail = 0;
-
+        get_file_info(inp->user_name, file_name, &fi);
+        at = 0;
         while (at < numbytes) {
-            printf("at = %d\n", at);
+          printf("at = %d\n", at);
             page_index = offset / PAGE_SIZE;
-            if (page_index >= fi.used) {
-                read_fail = 1;
-                break;
-            }
-
-            page_num = fi.pages[page_index];
-            if ((numbytes - at) < (PAGE_SIZE - (offset % PAGE_SIZE))) {
-                len = numbytes - at;
-            } else {
-                len = PAGE_SIZE - (offset % PAGE_SIZE);
-            }
-
-
-            fd = open("disk.dat", O_RDONLY);
-            // move to the current page that the file is being edited on
-            // lseek(fd, (PAGE_SIZE * page_num), SEEK_SET);
-            printf("PAGE_SIZE = %d \t page_num = %d\n",PAGE_SIZE, page_num );
-            lseek(fd,(PAGE_SIZE * page_num), SEEK_CUR);
-
-            printf("len = %d\n", len);
-            if(
-            read(fd, buffer, numbytes) < 0)
+            if (page_index >= fi.used)
             {
-              printf("an error occured during the read\n");
-              exit(-1);
+              read_fail = 1;
+              break;
             }
+            page_num = fi.pages[page_index];
+            if ((numbytes - at) < (PAGE_SIZE - (offset % PAGE_SIZE)))
+            {
+                len = numbytes - at;
+            }
+            else
+            {
+                    len = PAGE_SIZE - (offset % PAGE_SIZE);
+            }
+            fd = open("disk.dat", O_RDONLY);
+
+            lseek(fd, (PAGE_SIZE * page_num) + (offset % PAGE_SIZE), SEEK_SET);
+            printf("len = %d\n", len);
+            read(fd, buffer+at, len); // this is given segfaults....
             close(fd);
             at += len;
-            offset += len;
-            strncpy(message,buffer,512);
+            offset+=len;
             printf("%s\n", buffer);
+            set_file_offset(fi.fd,offset); //update the offset value
+
+          }
+          buffer[numbytes] = '\x00';
+          message = malloc(512);
+          strcpy(message,buffer);
         }
-        buffer[numbytes] = '\x00';
-        if (read_fail) {
-            // message = malloc(512);
-            snprintf(message, 512, "Error: writing past end of file.");
-            printf("%s\n", message);
-        }
-        else {
-            // message = malloc(message_size);
-            memset(message, 0, message_size);
-            snprintf(message, message_size, "Content read: %s", buffer);
-            printf("%s\n", message);
-        }
-    }
-    else {
-        // message = malloc(512);
+    else
+    {
+        // file doesn't exist
+        message = malloc(512);
+        memset(message,0,message_size);
         snprintf(message, 512, "Error: file %s does not exist.", fi.filename);
     }
-    // strncpy(message,fi.filename,512);
-    // strncpy(message,buffer,512);
     out.out_msg.out_msg_len = strlen(message) + 1;
     out.out_msg.out_msg_val = strdup(message);
-    // free(buffer);
-    // free(message);
-    // printf("%s (%d)\n", out.out_msg.out_msg_val, out.out_msg.out_msg_len);
     return &out;
 }
 
@@ -451,38 +453,50 @@ read_output * read_file_1_svc(read_input *inp, struct svc_req *rqstp)
 // RPC call "write".
 write_output * write_file_1_svc(write_input *inp, struct svc_req *rqstp)
 {
-
-    // check
-
     char message[512];
     char *buffer;
     file_info fi;
     int fd, numbytes, offset, size, at, page_index, page_num, len;
-
+    init_disk();
     printf("write_file_1_svc: (user_name = '%s', file_descriptor = '%i' numbytes = %d)\n",
            inp->user_name, inp->fd, inp->numbytes);
     printf("write buffer: %s\n", inp->buffer.buffer_val);
     static write_output out;
-    char *file_name = get_file_name(inp->user_name,inp->fd);
-    printf("file_name: %s\n", file_name);
-    printf("user_name: %s\n", inp->user_name);
-    printf("file_status: %d\n", get_file_status(inp->user_name, file_name));
-    if (file_exists(inp->user_name, file_name) && (get_file_status(inp->user_name, file_name) > 0)) {
+    char *file_name = get_file_name(inp->fd);
+    strcpy(fi.filename, file_name);
+    offset = get_file_offset(fi.fd); //set the file offset to the current value for the given file descriptor
+    if (file_exists(inp->user_name,file_name) && !(get_open_status_from_name(file_name)))
+    {
+      strcpy(message,"Error: File has been closed.");
+    }
+    if (file_exists_in_state(inp->fd) && (get_file_status(inp->fd) > 0)) {
         numbytes = inp->numbytes;
         buffer = inp->buffer.buffer_val;
-        printf("used = %d\n", fi.used);
+        get_file_info(inp->user_name,file_name, &fi);
+        if (offset > (fi.used * PAGE_SIZE - 1)) {
+            printf("used = %d\n", fi.used);
+            snprintf(message, 512, "Error: writing past end of file.");
+        }
+        else if ((offset + numbytes) > (PAGE_SIZE * MAX_PAGES))
+        {
+            snprintf(message, 512, "Error: write is too large.");
+        }
+        else
+        {
+          at = 0;
+          while (at < numbytes) {
+              page_index = offset / PAGE_SIZE;
+              if (page_index == fi.used)
+              {
+                page_num = get_free_page();
+                fi.pages[fi.used] = page_num;
+                fi.used++;
+                change_file_info(&fi);
+              }
+              else{
+                page_num = fi.pages[page_index];
 
-        at = 0;
-        // while (at < numbytes) {
-            // page_index = offset / PAGE_SIZE;
-            if (page_index == fi.used)
-            {
-              page_num = get_free_page();
-              fi.pages[fi.used] = page_num;
-              fi.used++;
-              change_file_info(&fi);
-              page_num = fi.pages[page_index];
-            }
+              }
 
             if ((numbytes - at) < (PAGE_SIZE - (offset % PAGE_SIZE)))
             {
@@ -493,27 +507,26 @@ write_output * write_file_1_svc(write_input *inp, struct svc_req *rqstp)
                     len = PAGE_SIZE - (offset % PAGE_SIZE);
             }
             fd = open("disk.dat", O_RDWR);
-            lseek(fd, (PAGE_SIZE * page_num), SEEK_SET);
-
             printf("lseek to %d\n", (PAGE_SIZE * page_num) + (offset % PAGE_SIZE));
             printf("%d %d %d\n", PAGE_SIZE, page_num, offset%PAGE_SIZE);
+            lseek(fd, (PAGE_SIZE * page_num), SEEK_SET);
             // lseek(fd, (PAGE_SIZE * page_num) + (offset % PAGE_SIZE), SEEK_SET);
             write(fd, buffer+at, len);
             close(fd);
             at += len;
-
+            offset += len;
+            set_file_offset(fi.fd,offset); //update the offset value
+          }
             snprintf(message, 512, "%d characters written to file %s", numbytes, fi.filename);
         }
-    // }
+    }
     else
     {
         // file doesn't exist
         snprintf(message, 512, "Error: file %s does not exist.", fi.filename);
     }
-    // strcpy(message,"testing write functionality");
     out.out_msg.out_msg_len = strlen(message) + 1;
     out.out_msg.out_msg_val = strdup(message);
-    // free(&message);
     return &out;
 
 }
@@ -561,8 +574,14 @@ close_output * close_file_1_svc(close_input *inp, struct svc_req *rqstp)
   char message[512];
   int status = -1;
   char* filename;
+  file_info fi;
+  strcpy(fi.username,inp->user_name);
+  filename = get_file_name(inp->fd);
+  strcpy(fi.filename,filename);
+  get_file_info(fi.username, filename, &fi);
   // make call to function that searches the file table and changes the file descriptor of the input file to denote that it is closed
   file_close(inp->user_name, inp->fd);
+  close_file_state(inp->fd);
   snprintf(message,512, "user '%s' closed: '%i'", inp->user_name, inp->fd);
   printf("%s\n", message);
   static close_output out;
