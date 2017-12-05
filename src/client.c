@@ -157,7 +157,7 @@ void main(int argc, char **argv)
   }
   Close(fd1);
 
-  fd2=Open("File1");
+  fd2=Open("File2");
   for (j=0; j< 20;j++){
   Read(fd2, buffer, 1);
   // printf("%s\n",buffer);
@@ -166,3 +166,4 @@ void main(int argc, char **argv)
   Delete("File1");
   List();
 }
+
